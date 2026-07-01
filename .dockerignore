@@ -1,0 +1,19 @@
+# 本地 docker build 时排除这些(从 git 部署时以仓库内容为准)
+node_modules
+.next
+.git
+.vercel
+
+# 密钥绝不进镜像
+.env*.local
+
+# 杂项
+*.log
+npm-debug.log*
+.DS_Store
+PROGRESS.md
+CLAUDE.md
+
+# 模型缓存:只保留检索用的 Xenova/bge-small-zh-v1.5,排除残留的其它模型
+.model-cache/Xenova/all-MiniLM-L6-v2
+.model-cache/BAAI

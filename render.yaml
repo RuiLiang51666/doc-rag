@@ -1,0 +1,18 @@
+# Render Blueprint —— 一键部署 doc-rag(智能问答服务)
+# 用法:把仓库连到 Render → New + → Blueprint → 选本仓库,Render 读取此文件。
+# 也可不用 Blueprint,手动 New Web Service(Docker)并按下方 envVars 配置。
+
+services:
+  - type: web
+    name: doc-rag
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free            # 512MB,闲置会休眠;需常亮改成 starter($7/月,512MB 常驻)
+    healthCheckPath: /
+    envVars:
+      - key: LLM_API_KEY   # 智谱 GLM key。sync:false → 在 Render 面板手填,不进仓库
+        sync: false
+      - key: LLM_BASE_URL
+        value: https://open.bigmodel.cn/api/paas/v4/
+      - key: LLM_MODEL
+        value: glm-4-flash
