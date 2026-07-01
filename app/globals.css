@@ -3,16 +3,17 @@
 @tailwind utilities;
 
 :root {
-  /* 浅色主题 · 克制配色 */
-  --background: #ffffff;
-  --surface: #ffffff;
-  --surface-muted: #f7f8fa;
-  --border: #e8eaed;
-  --foreground: #1f2329; /* 深灰，非纯黑 */
-  --muted: #6b7280;
-  --accent: #4f46e5; /* 靛蓝主色 */
-  --accent-hover: #4338ca;
-  --accent-soft: #eef2ff;
+  /* 编辑风 · 米白底 + 墨绿点缀,与作品集统一 */
+  --background: #f6f4ee;
+  --surface: #fffdf7;
+  --surface-muted: #f6f4ee;
+  --border: #e5dfce;
+  --foreground: #1b211f; /* 暖调深墨,非纯黑 */
+  --muted: #5f665f;
+  --accent: #147a6b; /* 墨绿主色 */
+  --accent-hover: #0f5f54;
+  --accent-soft: #e7f0ed;
+  --serif: Georgia, "Songti SC", "STSong", "Noto Serif SC", serif;
 }
 
 body {
@@ -21,6 +22,12 @@ body {
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+/* 编辑风:主标题用衬线,与作品集一致 */
+h1, h2 {
+  font-family: var(--serif);
+  letter-spacing: -0.01em;
 }
 
 code,
@@ -57,7 +64,7 @@ pre,
   width: 6px;
 }
 .thin-scroll::-webkit-scrollbar-thumb {
-  background: #d6d9de;
+  background: #d8d1bd;
   border-radius: 999px;
 }
 .thin-scroll::-webkit-scrollbar-track {

@@ -117,7 +117,7 @@ export default function Home() {
           {CARDS.map((c) => (
             <div
               key={c.title}
-              className="group rounded-xl border bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all duration-200 ease-out hover:-translate-y-1 hover:border-indigo-200 hover:shadow-[0_14px_32px_-12px_rgba(15,23,42,0.16)] sm:p-7"
+              className="group rounded-xl border bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all duration-200 ease-out hover:-translate-y-1 hover:border-[var(--accent)] hover:shadow-[0_14px_32px_-12px_rgba(15,23,42,0.16)] sm:p-7"
               style={{ borderColor: "var(--border)" }}
             >
               <span
