@@ -1,29 +1,41 @@
+"use client";
+
 import Assistant from "./components/Assistant";
 
 const NAV = ["文档", "API 参考", "教程", "下载"];
 
+/* Demo 页卡片均为演示性死链:点击统一拦截,转投右下角智能助手并自动检索对应主题 */
 const CARDS = [
   {
     title: "快速开始",
     desc: "几分钟内完成环境准备与安装，跑通你的第一个示例。",
     tag: "Guide",
+    prompt: "请根据本站文档，给我一份快速开始指南：环境准备、安装步骤和第一个可运行的示例。",
   },
   {
     title: "API 参考",
     desc: "完整的接口、参数与配置项说明，随用随查。",
     tag: "Reference",
+    prompt: "请帮我查阅本站文档中关于 API 的核心参数与配置说明。",
   },
   {
     title: "教程",
     desc: "由浅入深的实战示例，帮你掌握核心用法与最佳实践。",
     tag: "Tutorial",
+    prompt: "请基于本站文档，推荐一条由浅入深的学习路径，并概述各部分的重点。",
   },
   {
     title: "运维管理",
     desc: "部署、监控、备份与故障排查的运维指南。",
     tag: "Ops",
+    prompt: "请根据本站文档，总结部署、监控、备份与故障排查的关键运维要点。",
   },
 ];
+
+function ask(q: string, e?: React.MouseEvent) {
+  e?.preventDefault();
+  window.dispatchEvent(new CustomEvent("doc-rag:ask", { detail: { q } }));
+}
 
 export default function Home() {
   return (
@@ -87,15 +99,17 @@ export default function Home() {
           你的文档，可以对话
         </h1>
         <p
-          className="text-balance mx-auto mt-4 max-w-lg text-[15px] sm:text-base"
+          className="text-balance mx-auto mt-4 max-w-xl text-[15px] sm:text-base"
           style={{ color: "var(--muted)", lineHeight: 1.6 }}
         >
-          从入门指南到接口参考，全面的文档与示例助你快速上手。遇到问题？
-          点击右下角的 <span style={{ color: "var(--accent)" }}>智能助手</span>，基于文档即时解答。
+          从入门指南到接口参考，全面的文档与示例助你快速上手。遇到问题？无需四处翻找，
+          点击右下角<span style={{ color: "var(--accent)" }}>「智能助手」</span>或直接点击下方任意卡片，
+          基于本地向量库的 RAG 系统将为你即时解答。
         </p>
         <div className="mt-7 flex items-center justify-center gap-3">
           <a
             href="#"
+            onClick={(e) => ask(CARDS[0].prompt, e)}
             className="rounded-lg px-5 py-2.5 text-sm font-medium text-white transition-colors"
             style={{ background: "var(--accent)" }}
           >
@@ -103,6 +117,7 @@ export default function Home() {
           </a>
           <a
             href="#"
+            onClick={(e) => ask(CARDS[1].prompt, e)}
             className="rounded-lg border px-5 py-2.5 text-sm font-medium transition-colors hover:bg-white"
             style={{ borderColor: "var(--border)", color: "var(--foreground)" }}
           >
@@ -115,9 +130,11 @@ export default function Home() {
       <section className="mx-auto max-w-6xl px-6 pb-24">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4">
           {CARDS.map((c) => (
-            <div
+            <button
               key={c.title}
-              className="group rounded-xl border bg-white p-6 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all duration-200 ease-out hover:-translate-y-1 hover:border-[var(--accent)] hover:shadow-[0_14px_32px_-12px_rgba(15,23,42,0.16)] sm:p-7"
+              type="button"
+              onClick={() => ask(c.prompt)}
+              className="group cursor-pointer rounded-xl border bg-white p-6 text-left shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all duration-200 ease-out hover:-translate-y-1 hover:border-[var(--accent)] hover:shadow-[0_14px_32px_-12px_rgba(15,23,42,0.16)] sm:p-7"
               style={{ borderColor: "var(--border)" }}
             >
               <span
@@ -133,10 +150,10 @@ export default function Home() {
                 {c.desc}
               </p>
               <span className="mt-5 inline-flex items-center text-[13px] font-medium" style={{ color: "var(--accent)" }}>
-                了解更多
+                向助手提问
                 <span className="ml-1 transition-transform duration-200 ease-out group-hover:translate-x-1">→</span>
               </span>
-            </div>
+            </button>
           ))}
         </div>
       </section>

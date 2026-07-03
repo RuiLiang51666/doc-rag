@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 
 interface SearchResult {
@@ -18,10 +18,36 @@ export default function Assistant() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const [bouncing, setBouncing] = useState(false);
+  const [tip, setTip] = useState(false);
+  const loadingRef = useRef(false);
 
-  async function handleAsk() {
-    const q = question.trim();
-    if (!q || loading) return;
+  /* 页面卡片派发 doc-rag:ask 事件 → 展开面板、预填问题并自动发送(死链拦截联动) */
+  useEffect(() => {
+    function onAsk(e: Event) {
+      const q = (e as CustomEvent<{ q?: string }>).detail?.q?.trim();
+      if (!q) return;
+      setTip(false);
+      setOpen(true);
+      setQuestion(q);
+      handleAsk(q);
+    }
+    window.addEventListener("doc-rag:ask", onAsk);
+    return () => window.removeEventListener("doc-rag:ask", onAsk);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* 加载 1.5s 后:气泡提示 + 弹跳一次(约 2s 停止),吸引注意 */
+  useEffect(() => {
+    const t1 = setTimeout(() => { setBouncing(true); setTip(true); }, 1500);
+    const t2 = setTimeout(() => setBouncing(false), 3600);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+
+  async function handleAsk(qOverride?: string) {
+    const q = (qOverride ?? question).trim();
+    if (!q || loadingRef.current) return;
+    loadingRef.current = true;
 
     setLoading(true);
     setError("");
@@ -85,16 +111,32 @@ export default function Assistant() {
       setError(err instanceof Error ? err.message : "请求失败");
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   }
 
   return (
     <>
+      {/* 主动唤醒气泡:轻提示可点击,展开面板即消失 */}
+      {tip && !open && (
+        <button
+          onClick={() => { setTip(false); setOpen(true); }}
+          className="fixed bottom-[92px] right-5 z-50 rounded-xl border bg-white px-3.5 py-2 text-left text-[12.5px] leading-relaxed shadow-[0_8px_24px_rgba(15,23,42,0.12)]"
+          style={{ borderColor: "var(--border)", color: "var(--foreground)", maxWidth: "240px" }}
+        >
+          试试点击我，或点击页面任意卡片，直接对文档提问！👇
+          <span
+            className="absolute -bottom-1.5 right-6 h-3 w-3 rotate-45 border-b border-r bg-white"
+            style={{ borderColor: "var(--border)" }}
+          />
+        </button>
+      )}
+
       {/* 悬浮按钮 */}
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => { setTip(false); setOpen((v) => !v); }}
         aria-label={open ? "关闭助手" : "打开助手"}
-        className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg transition-transform hover:scale-105 active:scale-95"
+        className={`fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg transition-transform hover:scale-105 active:scale-95${bouncing && !open ? " animate-bounce" : ""}`}
         style={{ backgroundColor: "var(--accent)", boxShadow: "0 8px 24px rgba(79,70,229,0.35)" }}
       >
         {open ? <IconClose /> : <IconChat />}
@@ -230,7 +272,7 @@ export default function Assistant() {
                 style={{ borderColor: "var(--border)", color: "var(--foreground)" }}
               />
               <button
-                onClick={handleAsk}
+                onClick={() => handleAsk()}
                 disabled={loading || !question.trim()}
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white transition-colors disabled:opacity-40"
                 style={{ backgroundColor: "var(--accent)" }}
