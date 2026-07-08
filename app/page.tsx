@@ -2,9 +2,17 @@
 
 import Assistant from "./components/Assistant";
 
-const NAV = ["文档", "API 参考", "教程", "下载"];
+/* 全站无死链:每个可点击位都映射为一个与知识库内容对齐的问题,点击即转投智能助手。
+   知识库主题覆盖:产品介绍/快速开始/部署/SQL 参考/开发接入/运维/工具/最佳实践/版本说明 */
+const NAV = [
+  { label: "产品介绍", prompt: "请根据本站文档，介绍一下本产品是什么，它的核心特性与典型应用场景有哪些？" },
+  { label: "部署指南", prompt: "请根据本站文档，总结本产品支持的部署方式，以及部署前需要满足的环境要求。" },
+  { label: "最佳实践", prompt: "请根据本站文档，介绍有哪些最佳实践，例如高可用部署或 JDBC 批量写入的建议做法。" },
+  { label: "版本说明", prompt: "请根据本站文档，介绍最新版本包含的主要新特性与重要变更。" },
+];
 
-/* Demo 页卡片均为演示性死链:点击统一拦截,转投右下角智能助手并自动检索对应主题 */
+const CONSOLE_PROMPT = "请根据本站文档，介绍本产品提供了哪些数据库管理与开发工具，分别适用于什么场景？";
+
 const CARDS = [
   {
     title: "快速开始",
@@ -13,16 +21,16 @@ const CARDS = [
     prompt: "请根据本站文档，给我一份快速开始指南：环境准备、安装步骤和第一个可运行的示例。",
   },
   {
-    title: "API 参考",
-    desc: "完整的接口、参数与配置项说明，随用随查。",
+    title: "SQL 参考",
+    desc: "完整的 SQL 语法、数据类型与函数说明，随用随查。",
     tag: "Reference",
-    prompt: "请帮我查阅本站文档中关于 API 的核心参数与配置说明。",
+    prompt: "请根据本站文档，概述本产品支持的 SQL 语法类别与常用语句，并举例说明。",
   },
   {
-    title: "教程",
-    desc: "由浅入深的实战示例，帮你掌握核心用法与最佳实践。",
-    tag: "Tutorial",
-    prompt: "请基于本站文档，推荐一条由浅入深的学习路径，并概述各部分的重点。",
+    title: "开发接入",
+    desc: "通过 JDBC 等驱动连接数据库，快速完成应用开发。",
+    tag: "Develop",
+    prompt: "请根据本站文档，说明如何通过 JDBC 连接数据库并完成建表与数据写入，尽量给出示例代码。",
   },
   {
     title: "运维管理",
@@ -64,21 +72,23 @@ export default function Home() {
           <nav className="hidden items-center gap-8 sm:flex">
             {NAV.map((n) => (
               <a
-                key={n}
+                key={n.label}
                 href="#"
+                onClick={(e) => ask(n.prompt, e)}
                 className="text-[13.5px] transition-colors hover:text-[var(--accent)]"
                 style={{ color: "var(--muted)" }}
               >
-                {n}
+                {n.label}
               </a>
             ))}
           </nav>
           <a
             href="#"
-            className="rounded-lg px-3 py-1.5 text-sm font-medium text-white transition-colors"
+            onClick={(e) => ask(CONSOLE_PROMPT, e)}
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--accent-hover)]"
             style={{ background: "var(--accent)" }}
           >
-            控制台
+            管理工具
           </a>
         </div>
       </header>
@@ -103,9 +113,9 @@ export default function Home() {
           style={{ color: "var(--muted)", lineHeight: 1.6 }}
         >
           {/* 文案连写在单个表达式里,避免 JSX 换行在中文句中引入多余空格 */}
-          {"从入门指南到接口参考，结构化的文档与详实的示例助你快速上手。遇到问题？无需四处翻找，点击右下角"}
+          {"从入门指南到 SQL 参考，结构化的文档与详实的示例助你快速上手。遇到问题？无需四处翻找，点击右下角"}
           <span style={{ color: "var(--accent)" }}>「智能助手」</span>
-          {"或直接点击下方任意卡片，获取基于本地向量库 RAG 系统的即时解答。"}
+          {"，或直接点击页面任意导航、按钮与卡片，获取基于本地向量库 RAG 系统的即时解答。"}
         </p>
         <div className="mt-7 flex items-center justify-center gap-3">
           <a
@@ -122,7 +132,7 @@ export default function Home() {
             className="rounded-lg border bg-white px-5 py-2.5 text-sm font-medium transition-colors hover:border-[var(--accent)]"
             style={{ borderColor: "#d3cbb8", color: "var(--foreground)" }}
           >
-            查看 API 参考
+            查看 SQL 参考
           </a>
         </div>
       </section>

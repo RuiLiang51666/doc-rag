@@ -124,7 +124,7 @@ export default function Assistant() {
           className="fixed bottom-[92px] right-5 z-50 rounded-xl border bg-white px-3.5 py-2 text-left text-[12.5px] leading-relaxed shadow-[0_8px_24px_rgba(15,23,42,0.12)]"
           style={{ borderColor: "var(--border)", color: "var(--foreground)", maxWidth: "240px" }}
         >
-          试试点击我，或点击页面任意卡片，直接对文档提问！👇
+          试试点击我，或点击页面任意导航、按钮与卡片，直接对文档提问！👇
           <span
             className="absolute -bottom-1.5 right-6 h-3 w-3 rotate-45 border-b border-r bg-white"
             style={{ borderColor: "var(--border)" }}
@@ -137,7 +137,7 @@ export default function Assistant() {
         onClick={() => { setTip(false); setOpen((v) => !v); }}
         aria-label={open ? "关闭助手" : "打开助手"}
         className={`fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg transition-transform hover:scale-105 active:scale-95${bouncing && !open ? " animate-bounce" : ""}`}
-        style={{ backgroundColor: "var(--accent)", boxShadow: "0 8px 24px rgba(79,70,229,0.35)" }}
+        style={{ backgroundColor: "var(--accent)", boxShadow: "0 8px 24px rgba(20,122,107,0.35)" }}
       >
         {open ? <IconClose /> : <IconChat />}
       </button>
