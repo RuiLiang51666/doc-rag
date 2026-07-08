@@ -120,7 +120,9 @@ export async function POST(req: NextRequest) {
 
   return new Response(stream, {
     headers: {
-      "Content-Type": "text/plain; charset=utf-8",
+      // 声明为 SSE 类型:Render/Cloudflare 对 text/plain 流会整体缓冲后一次性下发,
+      // 只有 text/event-stream 保证逐块透传(正文仍是纯文本 + META 尾包,前端解析不变)
+      "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
       "X-Accel-Buffering": "no",
     },
