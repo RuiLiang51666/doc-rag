@@ -16,11 +16,14 @@ export default function Assistant() {
   const [answer, setAnswer] = useState("");
   const [sources, setSources] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState("");        // 后端业务错误(确定性,如问题为空/LLM 报错):红色提示
+  const [failed, setFailed] = useState(false);   // 重试仍失败(网络/唤醒超时):友好兜底 + 重试按钮
+  const [waking, setWaking] = useState(false);   // 正在重试(冷启动/偶发断连):显示"服务正在唤醒"
   const [openIdx, setOpenIdx] = useState<number | null>(null);
   const [bouncing, setBouncing] = useState(false);
   const [tip, setTip] = useState(false);
   const loadingRef = useRef(false);
+  const lastAskedRef = useRef("");               // 供"重试"按钮重发上一个问题
 
   /* 页面卡片派发 doc-rag:ask 事件 → 展开面板、预填问题并自动发送(死链拦截联动) */
   useEffect(() => {
@@ -44,26 +47,39 @@ export default function Assistant() {
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
-  async function handleAsk(qOverride?: string) {
-    const q = (qOverride ?? question).trim();
-    if (!q || loadingRef.current) return;
-    loadingRef.current = true;
+  // 免费实例冷启动最长约 50s,单次给到 75s 容忍唤醒;超时/断连/网关错误自动重试
+  const MAX_ATTEMPTS = 3; // 1 正常 + 2 重试
+  const ATTEMPT_TIMEOUT = 75_000;
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-    setLoading(true);
-    setError("");
+  /**
+   * 单次请求 + 流式读取。
+   * 正常返回 = 已处理完成(成功,或后端确定性业务错误,均已上屏),不再重试;
+   * 抛出异常 = 可重试错误(网络/超时/网关 5xx/空流)。
+   */
+  async function runOnce(q: string): Promise<void> {
     setAnswer("");
     setSources([]);
     setOpenIdx(null);
+
+    const ctrl = new AbortController();
+    let firstByte = false;
+    // 只守护"连接 + 首字节":一旦开始出字就清掉,不误杀正常的长生成
+    const timer = setTimeout(() => {
+      if (!firstByte) ctrl.abort();
+    }, ATTEMPT_TIMEOUT);
 
     try {
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: q }),
+        signal: ctrl.signal,
       });
 
-      // 非流式错误（如 400/500，返回 JSON）
       const ctype = res.headers.get("Content-Type") || "";
+
+      // 后端业务错误(JSON,如 400 问题为空 / 502 LLM 报错):确定性,直接展示不重试
       if (!res.ok && ctype.includes("application/json")) {
         const data = await res.json();
         setError(data.error || "请求失败");
@@ -71,46 +87,82 @@ export default function Assistant() {
         return;
       }
 
+      // 网关/唤醒错误(502/503/504,通常是 HTML 或空):当作可重试错误抛出,不当答案渲染
+      if (!res.ok || !res.body) {
+        throw new Error(`gateway_${res.status}`);
+      }
+
       // 流式读取：逐块拼接回答；末尾 META 标记后是 sources/error 的 JSON
       const META = "\n<<<META>>>";
-      const reader = res.body!.getReader();
+      const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let metaSplit = false;
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        const idx = buffer.indexOf(META);
-        if (idx === -1) {
-          // 还没到 META，整段都是回答正文
-          setAnswer(buffer);
-        } else {
-          // META 出现：前半是最终回答，后半是元信息 JSON
-          metaSplit = true;
-          setAnswer(buffer.slice(0, idx));
+        if (!firstByte) {
+          firstByte = true;
+          clearTimeout(timer);
+          setWaking(false); // 已开始出字,撤下"唤醒中"提示
         }
+        buffer += decoder.decode(value, { stream: true });
+        const idx = buffer.indexOf(META);
+        setAnswer(idx === -1 ? buffer : buffer.slice(0, idx));
       }
 
       // 处理结尾的 META（sources / error）
-      if (metaSplit) {
-        const idx = buffer.indexOf(META);
+      const idx = buffer.indexOf(META);
+      if (idx !== -1) {
         setAnswer(buffer.slice(0, idx));
-        const metaStr = buffer.slice(idx + META.length);
         try {
-          const meta = JSON.parse(metaStr);
+          const meta = JSON.parse(buffer.slice(idx + META.length));
           if (meta.error) setError(meta.error);
           if (meta.sources) setSources(meta.sources);
         } catch {
           /* META 解析失败则忽略，回答正文已展示 */
         }
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "请求失败");
+
+      // 流开了但整段为空(极端异常):当作失败以便重试
+      if (!buffer.trim()) throw new Error("empty_stream");
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async function handleAsk(qOverride?: string) {
+    const q = (qOverride ?? question).trim();
+    if (!q || loadingRef.current) return;
+    loadingRef.current = true;
+    lastAskedRef.current = q;
+
+    setLoading(true);
+    setError("");
+    setFailed(false);
+    setWaking(false);
+    setAnswer("");
+    setSources([]);
+    setOpenIdx(null);
+
+    try {
+      for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+        if (attempt > 1) setWaking(true); // 第 2 次起提示"服务正在唤醒"
+        try {
+          await runOnce(q);
+          return; // 已完成(成功或业务错误),结束
+        } catch (err) {
+          if (attempt === MAX_ATTEMPTS) throw err; // 重试用尽,交给外层兜底
+          await sleep(600 * attempt); // 递增退避,给实例唤醒/恢复的时间
+        }
+      }
+    } catch {
+      // 网络/超时/网关等瞬时故障重试仍失败:友好兜底 + 重试按钮,不裸奔 network error
+      setFailed(true);
+      setAnswer("");
     } finally {
       setLoading(false);
+      setWaking(false);
       loadingRef.current = false;
     }
   }
@@ -176,7 +228,7 @@ export default function Assistant() {
           {/* 内容区（可滚动） */}
           <div className="thin-scroll flex-1 overflow-y-auto px-4 py-4" style={{ background: "var(--surface-muted)" }}>
             {/* 空状态 */}
-            {!answer && !error && !loading && (
+            {!answer && !error && !loading && !failed && (
               <div className="mt-6 text-center text-sm" style={{ color: "var(--muted)" }}>
                 <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl" style={{ background: "var(--accent-soft)", color: "var(--accent)" }}>
                   <IconChat />
@@ -201,13 +253,30 @@ export default function Assistant() {
             {loading && !answer && (
               <div className="flex items-center gap-2 text-sm" style={{ color: "var(--muted)" }}>
                 <span className="h-2 w-2 animate-pulse rounded-full" style={{ background: "var(--accent)" }} />
-                正在检索文档并生成回答…
+                {waking ? "服务正在唤醒，请稍候…（首次访问约需 1 分钟）" : "正在检索文档并生成回答…"}
               </div>
             )}
 
             {error && (
               <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                 ⚠️ {error}
+              </div>
+            )}
+
+            {/* 网络/唤醒重试仍失败:体面兜底,给一键重试,不裸奔 network error */}
+            {failed && !loading && (
+              <div className="rounded-xl border bg-white px-4 py-4 text-sm" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
+                <p className="font-medium" style={{ color: "var(--foreground)" }}>服务有点忙，暂时没连上 😴</p>
+                <p className="mt-1 leading-relaxed">
+                  演示服务部署在免费实例上，空闲后会休眠。可能正在唤醒，稍等片刻再点重试通常就好了。
+                </p>
+                <button
+                  onClick={() => handleAsk(lastAskedRef.current)}
+                  className="mt-3 rounded-lg px-3.5 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-[var(--accent-hover)]"
+                  style={{ background: "var(--accent)" }}
+                >
+                  重新试试 →
+                </button>
               </div>
             )}
 
