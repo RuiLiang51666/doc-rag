@@ -21,12 +21,6 @@ const CARDS = [
     prompt: "请根据本站文档，给我一份快速开始指南：环境准备、安装步骤和第一个可运行的示例。",
   },
   {
-    title: "SQL 参考",
-    desc: "完整的 SQL 语法、数据类型与函数说明，随用随查。",
-    tag: "Reference",
-    prompt: "请根据本站文档，概述本产品支持的 SQL 语法类别与常用语句，并举例说明。",
-  },
-  {
     title: "开发接入",
     desc: "通过 JDBC 等驱动连接数据库，快速完成应用开发。",
     tag: "Develop",
@@ -38,7 +32,18 @@ const CARDS = [
     tag: "Ops",
     prompt: "请根据本站文档，总结部署、监控、备份与故障排查的关键运维要点。",
   },
+  {
+    title: "SQL 参考",
+    desc: "完整的 SQL 语法、数据类型与函数说明，随用随查。",
+    tag: "Reference",
+    prompt: "请根据本站文档，概述本产品支持的 SQL 语法类别与常用语句，并举例说明。",
+  },
 ];
+
+/* 作品集主页(本 demo 由梁瑞的作品集页跳转而来,提供返回入口) */
+const PORTFOLIO_URL = "https://personal-site-two-jet.vercel.app/";
+/* hero 副按钮固定指向「SQL 参考」,按 tag 取以免卡片顺序调整后错位 */
+const SQL_PROMPT = CARDS.find((c) => c.tag === "Reference")!.prompt;
 
 function ask(q: string, e?: React.MouseEvent) {
   e?.preventDefault();
@@ -58,17 +63,18 @@ export default function Home() {
         }}
       >
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-          <div className="flex items-center gap-2.5">
+          {/* 品牌区即「返回主页」入口:本 demo 由作品集页跳转而来,点击 logo 回到作品集主页 */}
+          <a href={PORTFOLIO_URL} title="返回作品集主页" className="group flex items-center gap-2.5">
             <span
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-sm font-bold text-white"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-sm font-bold text-white transition-transform group-hover:scale-105"
               style={{ background: "var(--accent)" }}
             >
               K
             </span>
-            <span className="text-[15px] font-semibold tracking-[-0.01em]" style={{ color: "var(--foreground)" }}>
+            <span className="text-[15px] font-semibold tracking-[-0.01em] transition-colors group-hover:text-[var(--accent)]" style={{ color: "var(--foreground)" }}>
               开发者文档
             </span>
-          </div>
+          </a>
           <nav className="hidden items-center gap-8 sm:flex">
             {NAV.map((n) => (
               <a
@@ -128,7 +134,7 @@ export default function Home() {
           </a>
           <a
             href="#"
-            onClick={(e) => ask(CARDS[1].prompt, e)}
+            onClick={(e) => ask(SQL_PROMPT, e)}
             className="rounded-lg border bg-white px-5 py-2.5 text-sm font-medium transition-colors hover:border-[var(--accent)]"
             style={{ borderColor: "#d3cbb8", color: "var(--foreground)" }}
           >

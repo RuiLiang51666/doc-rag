@@ -4,6 +4,7 @@ import {
   createAnswerStream,
   rewriteQueryLocal,
   parseUsedIndices,
+  stripFragmentMarkers,
   USED_MARKER_KEYWORD,
 } from "@/lib/llm";
 
@@ -55,7 +56,8 @@ export async function POST(req: NextRequest) {
   }
 
   const tGen0 = performance.now();
-  const HOLDBACK = USED_MARKER_KEYWORD.length; // 防止把"引用片段"标记的开头推给前端
+  // 尾部 holdback:同时覆盖"引用片段"关键字与内联「【片段 N】」标记,防止其跨 delta 被截断后漏出
+  const HOLDBACK = Math.max(USED_MARKER_KEYWORD.length, 20);
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -80,12 +82,26 @@ export async function POST(req: NextRequest) {
             } else {
               // 尚未出现：保留尾部 HOLDBACK 字符，防止标记关键字跨 delta 被截断
               visibleEnd = Math.max(sentLen, full.length - HOLDBACK);
+              // 不要在尚未闭合的「【…」中间切断(可能是正在生成的片段标记),等 】到齐再推
+              const lastOpen = full.lastIndexOf("【");
+              if (lastOpen >= sentLen && full.indexOf("】", lastOpen) === -1) {
+                visibleEnd = Math.min(visibleEnd, lastOpen);
+              }
             }
             if (visibleEnd > sentLen) {
-              controller.enqueue(enc.encode(full.slice(sentLen, visibleEnd)));
+              // 逐块清洗内联片段标记(双保险,与非流式路径一致);不 trim,避免吃掉词间空白
+              const cleaned = stripFragmentMarkers(full.slice(sentLen, visibleEnd));
+              if (cleaned) controller.enqueue(enc.encode(cleaned));
               sentLen = visibleEnd;
             }
           }
+        }
+
+        // 流自然结束但未见「引用片段」行(模型偶尔不输出):补推尾部剩余正文,避免末尾被 holdback 吞掉
+        if (!markerSeen && full.length > sentLen) {
+          const cleaned = stripFragmentMarkers(full.slice(sentLen));
+          if (cleaned) controller.enqueue(enc.encode(cleaned));
+          sentLen = full.length;
         }
 
         // 流结束：解析实际引用的片段，附上来源元信息
