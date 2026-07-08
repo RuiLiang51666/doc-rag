@@ -102,9 +102,10 @@ export default function Home() {
           className="text-balance mx-auto mt-4 max-w-xl text-[15px] sm:text-base"
           style={{ color: "var(--muted)", lineHeight: 1.6 }}
         >
-          从入门指南到接口参考，全面的文档与示例助你快速上手。遇到问题？无需四处翻找，
-          点击右下角<span style={{ color: "var(--accent)" }}>「智能助手」</span>或直接点击下方任意卡片，
-          基于本地向量库的 RAG 系统将为你即时解答。
+          {/* 文案连写在单个表达式里,避免 JSX 换行在中文句中引入多余空格 */}
+          {"从入门指南到接口参考，结构化的文档与详实的示例助你快速上手。遇到问题？无需四处翻找，点击右下角"}
+          <span style={{ color: "var(--accent)" }}>「智能助手」</span>
+          {"或直接点击下方任意卡片，获取基于本地向量库 RAG 系统的即时解答。"}
         </p>
         <div className="mt-7 flex items-center justify-center gap-3">
           <a
@@ -118,8 +119,8 @@ export default function Home() {
           <a
             href="#"
             onClick={(e) => ask(CARDS[1].prompt, e)}
-            className="rounded-lg border px-5 py-2.5 text-sm font-medium transition-colors hover:bg-white"
-            style={{ borderColor: "var(--border)", color: "var(--foreground)" }}
+            className="rounded-lg border bg-white px-5 py-2.5 text-sm font-medium transition-colors hover:border-[var(--accent)]"
+            style={{ borderColor: "#d3cbb8", color: "var(--foreground)" }}
           >
             查看 API 参考
           </a>
@@ -134,12 +135,12 @@ export default function Home() {
               key={c.title}
               type="button"
               onClick={() => ask(c.prompt)}
-              className="group cursor-pointer rounded-xl border bg-white p-6 text-left shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all duration-200 ease-out hover:-translate-y-1 hover:border-[var(--accent)] hover:shadow-[0_14px_32px_-12px_rgba(15,23,42,0.16)] sm:p-7"
+              className="group flex h-full cursor-pointer flex-col rounded-xl border bg-white p-6 text-left shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-all duration-300 ease-out hover:-translate-y-1 hover:border-[var(--accent)] hover:shadow-[0_14px_32px_-12px_rgba(15,23,42,0.16)] sm:p-7"
               style={{ borderColor: "var(--border)" }}
             >
               <span
-                className="inline-block rounded-md px-2 py-0.5 text-[11px] font-medium"
-                style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
+                className="inline-block rounded-md px-2 py-0.5 text-[11px] font-semibold"
+                style={{ background: "var(--accent-soft)", color: "var(--accent-hover)" }}
               >
                 {c.tag}
               </span>
@@ -149,7 +150,7 @@ export default function Home() {
               <p className="mt-2.5 text-[13.5px]" style={{ color: "var(--muted)", lineHeight: 1.6 }}>
                 {c.desc}
               </p>
-              <span className="mt-5 inline-flex items-center text-[13px] font-medium" style={{ color: "var(--accent)" }}>
+              <span className="mt-auto inline-flex items-center pt-5 text-[13px] font-medium" style={{ color: "var(--accent)" }}>
                 向助手提问
                 <span className="ml-1 transition-transform duration-200 ease-out group-hover:translate-x-1">→</span>
               </span>
