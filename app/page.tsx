@@ -41,7 +41,7 @@ const CARDS = [
 ];
 
 /* 作品集主页(本 demo 由梁瑞的作品集页跳转而来,提供返回入口) */
-const PORTFOLIO_URL = "https://personal-site-two-jet.vercel.app/";
+const PORTFOLIO_URL = "https://liangrui.vercel.app/";
 /* hero 副按钮固定指向「SQL 参考」,按 tag 取以免卡片顺序调整后错位 */
 const SQL_PROMPT = CARDS.find((c) => c.tag === "Reference")!.prompt;
 
