@@ -257,3 +257,5 @@ cd ~/doc-rag
 - 验证:同一泄漏问题(快速开始指南)重打 API,正文 0 处片段标记。
 
 **验证**:dev 服务器热更新后,首页无 console 报错、无横向溢出;字体/纸纹/主色计算值全部正确;点卡片 → 助手弹出 → 问题发送 → RAG 流式回答正常。
+
+**补充(同日)**:删除未使用的 Geist 本地字体(layout.tsx 的 localFont + app/fonts/),换肤后已无引用,省 ~100KB 加载;`next build` 通过(首页 First Load JS 129KB)。
