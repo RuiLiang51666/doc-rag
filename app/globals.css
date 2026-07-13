@@ -1,31 +1,43 @@
+@import url("https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400..900;1,8..60,400..900&family=Hanken+Grotesk:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  /* 编辑风 · 米白底 + 墨绿点缀,与作品集统一 */
-  --background: #f6f4ee;
-  --surface: #fffdf7;
-  --surface-muted: #f6f4ee;
-  --border: #e5dfce;
-  --foreground: #1b211f; /* 暖调深墨,非纯黑 */
-  --muted: #5f665f;
-  --accent: #147a6b; /* 墨绿主色 */
-  --accent-hover: #0f5f54;
-  --accent-soft: #e7f0ed;
-  --serif: Georgia, "Songti SC", "STSong", "Noto Serif SC", serif;
+  /* Clarified Editorial · 与作品集(liangrui.vercel.app)同一套设计语言 */
+  --background: #f7f6f0;          /* 纸感底 */
+  --surface: #fffefb;             /* 卡片近白 */
+  --surface-muted: #f7f6f0;
+  --vellum: rgba(255, 255, 255, 0.55);
+  --border: rgba(0, 91, 77, 0.15); /* hairline */
+  --border-strong: rgba(0, 91, 77, 0.28);
+  --foreground: #1a1a1a;
+  --muted: #666666;
+  --accent: #005b4d;              /* 深绿主色 */
+  --accent-hover: #004137;
+  --accent-soft: rgba(0, 91, 77, 0.08);
+  --oxblood: #5f291b;             /* 三级强调,少用 */
+  --serif: "Source Serif 4", Georgia, "Songti SC", serif;
+  --sans: "Hanken Grotesk", -apple-system, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --mono: "JetBrains Mono", "PingFang SC", "Microsoft YaHei", ui-monospace, Menlo, monospace;
 }
 
 body {
   color: var(--foreground);
-  background: var(--surface-muted);
-  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, -apple-system,
-    "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--surface-muted);
+  background-image: url("/paper-texture.png");
+  font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
 }
 
-/* 编辑风:主标题用衬线,与作品集一致 */
-h1, h2 {
+::selection {
+  background: rgba(0, 91, 77, 0.18);
+  color: var(--accent);
+}
+
+/* 编辑风:标题用衬线,与作品集一致 */
+h1, h2, h3 {
   font-family: var(--serif);
   letter-spacing: -0.01em;
 }
@@ -34,13 +46,20 @@ code,
 kbd,
 pre,
 .font-mono {
-  font-family: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, Consolas,
-    monospace;
+  font-family: var(--mono);
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  /* mono 小标签(eyebrow / tag / 按钮字),与作品集 t-eyebrow / .btn 同配方 */
+  .t-label {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
   }
 }
 
@@ -64,7 +83,7 @@ pre,
   width: 6px;
 }
 .thin-scroll::-webkit-scrollbar-thumb {
-  background: #d8d1bd;
+  background: #d5d5cb;
   border-radius: 999px;
 }
 .thin-scroll::-webkit-scrollbar-track {

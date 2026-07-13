@@ -241,3 +241,19 @@ cd ~/doc-rag
 2. 可选打磨：回答流式输出（提升体验）、切块"不切断代码块"修复、枚举型问题加大 TopK。
 3. 面试演示前：准备 3-5 个稳定问题的演示脚本。
 4. 重测确认产品介绍页 / 时序数据类型页能进 Top 8 后，再回头处理 6.3 的小问题。
+
+---
+
+## 9. Clarified Editorial 换肤 + 流式标记泄漏修复（2026-07-13 ✅）
+
+**换肤(与作品集 liangrui.vercel.app 同一设计语言,功能逻辑未动)**:
+- `app/globals.css`:token 全换 —— 纸感底 `#f7f6f0` + 纸纹(`/paper-texture.png`)、深绿主色 `#005b4d`、hairline 边框 `rgba(0,91,77,0.15)`;字体 Google Fonts(Source Serif 4 标题 / Hanken Grotesk 正文 / JetBrains Mono 标签),新增 `.t-label` mono 小标签工具类。Assistant.tsx 全用 `var(--accent)` 等变量,零改动自动换肤。
+- `app/page.tsx`:外壳按 Stitch 稿重写 —— 衬线绿 wordmark、mono 导航、药丸按钮;hero 7/5 左文右图(`/illust-qa.jpg`);01 核心板块带状底 + 4 张 vellum 卡;oxblood 左边线引文横幅;02 交互特性 4 项(流式/改写/溯源/上下文);深绿网格纹 CTA;编辑风页脚。NAV/CARDS/prompt 映射与「全站无死链」原则原样保留。
+- `public/`(新建):paper-texture.png、illust-qa.jpg(自作品集资产复制)。
+
+**修复:「【片段 N】」再次漏出**
+- 根因:`app/api/ask/route.ts` 的 holdback 只在「【 之后没有 】」时停推;若 】已到达但切点落在【…】中间,标记被劈成两半分次推送,两侧都匹配不上清洗正则,拼回后原样可见。
+- 修法:只要 】 缺失**或落在本次推送范围之外**,一律停在 【 前等标记完整再推。
+- 验证:同一泄漏问题(快速开始指南)重打 API,正文 0 处片段标记。
+
+**验证**:dev 服务器热更新后,首页无 console 报错、无横向溢出;字体/纸纹/主色计算值全部正确;点卡片 → 助手弹出 → 问题发送 → RAG 流式回答正常。

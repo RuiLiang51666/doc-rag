@@ -82,10 +82,14 @@ export async function POST(req: NextRequest) {
             } else {
               // 尚未出现：保留尾部 HOLDBACK 字符，防止标记关键字跨 delta 被截断
               visibleEnd = Math.max(sentLen, full.length - HOLDBACK);
-              // 不要在尚未闭合的「【…」中间切断(可能是正在生成的片段标记),等 】到齐再推
+              // 不要在「【…】」中间切断(可能是片段标记):】尚未到达、或落在本次推送范围之外时,
+              // 都先停在 【 前等标记完整,否则被劈成两半的标记两侧都匹配不上清洗正则,会原样漏给用户
               const lastOpen = full.lastIndexOf("【");
-              if (lastOpen >= sentLen && full.indexOf("】", lastOpen) === -1) {
-                visibleEnd = Math.min(visibleEnd, lastOpen);
+              if (lastOpen >= sentLen) {
+                const close = full.indexOf("】", lastOpen);
+                if (close === -1 || close >= visibleEnd) {
+                  visibleEnd = Math.min(visibleEnd, lastOpen);
+                }
               }
             }
             if (visibleEnd > sentLen) {
