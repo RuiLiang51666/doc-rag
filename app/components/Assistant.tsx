@@ -10,6 +10,14 @@ interface SearchResult {
   heading: string;
 }
 
+/** 兜底清洗内部片段标记(与服务端同款):流式累积缓冲会把跨块劈开的标记重新拼完整,
+ *  每次 setAnswer 前在完整文本上再清一遍,即使服务端漏网也不会呈现给用户 */
+function stripMarkers(s: string): string {
+  return s
+    .replace(/[【\[]\s*片段[\s\d０-９，,、和及片段]*[】\]]/g, "")
+    .replace(/(根据|参见|见|来自|依据)?\s*片段\s*[\d０-９]+(\s*[、，,和及]\s*[\d０-９]+)*/g, "");
+}
+
 export default function Assistant() {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
@@ -108,13 +116,13 @@ export default function Assistant() {
         }
         buffer += decoder.decode(value, { stream: true });
         const idx = buffer.indexOf(META);
-        setAnswer(idx === -1 ? buffer : buffer.slice(0, idx));
+        setAnswer(stripMarkers(idx === -1 ? buffer : buffer.slice(0, idx)));
       }
 
       // 处理结尾的 META（sources / error）
       const idx = buffer.indexOf(META);
       if (idx !== -1) {
-        setAnswer(buffer.slice(0, idx));
+        setAnswer(stripMarkers(buffer.slice(0, idx)));
         try {
           const meta = JSON.parse(buffer.slice(idx + META.length));
           if (meta.error) setError(meta.error);
@@ -176,7 +184,7 @@ export default function Assistant() {
           className="fixed bottom-[92px] right-5 z-50 rounded-xl border bg-white px-3.5 py-2 text-left text-[12.5px] leading-relaxed shadow-[0_8px_24px_rgba(15,23,42,0.12)]"
           style={{ borderColor: "var(--border)", color: "var(--foreground)", maxWidth: "240px" }}
         >
-          试试点击我，或点击页面任意导航、按钮与卡片，直接对文档提问！👇
+          试试点击我，或点击页面上的任意按钮，直接对文档提问！👇
           <span
             className="absolute -bottom-1.5 right-6 h-3 w-3 rotate-45 border-b border-r bg-white"
             style={{ borderColor: "var(--border)" }}
@@ -189,7 +197,7 @@ export default function Assistant() {
         onClick={() => { setTip(false); setOpen((v) => !v); }}
         aria-label={open ? "关闭助手" : "打开助手"}
         className={`fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full text-white shadow-lg transition-transform hover:scale-105 active:scale-95${bouncing && !open ? " animate-bounce" : ""}`}
-        style={{ backgroundColor: "var(--accent)", boxShadow: "0 8px 24px rgba(20,122,107,0.35)" }}
+        style={{ backgroundColor: "var(--accent)", boxShadow: "0 8px 24px rgba(0,91,77,0.35)" }}
       >
         {open ? <IconClose /> : <IconChat />}
       </button>
@@ -287,7 +295,7 @@ export default function Assistant() {
                                 prose-li:text-[var(--foreground)] prose-strong:text-[var(--foreground)]
                                 prose-a:text-[var(--accent)]
                                 prose-code:rounded prose-code:bg-[var(--accent-soft)] prose-code:px-1 prose-code:py-0.5 prose-code:text-[var(--accent)] prose-code:before:content-none prose-code:after:content-none
-                                prose-pre:bg-[#1e293b] prose-pre:text-gray-100 prose-pre:text-[12px]">
+                                prose-pre:bg-[#013128] prose-pre:text-[#d9efe6] prose-pre:text-[12px]">
                   <ReactMarkdown>{answer}</ReactMarkdown>
                 </div>
               </div>

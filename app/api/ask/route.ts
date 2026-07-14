@@ -83,12 +83,14 @@ export async function POST(req: NextRequest) {
               // 尚未出现：保留尾部 HOLDBACK 字符，防止标记关键字跨 delta 被截断
               visibleEnd = Math.max(sentLen, full.length - HOLDBACK);
               // 不要在「【…】」中间切断(可能是片段标记):】尚未到达、或落在本次推送范围之外时,
-              // 都先停在 【 前等标记完整,否则被劈成两半的标记两侧都匹配不上清洗正则,会原样漏给用户
-              const lastOpen = full.lastIndexOf("【");
+              // 都先停在 【 前等标记完整,否则被劈成两半的标记两侧都匹配不上清洗正则,会原样漏给用户。
+              // 注意必须找「推送窗口内」最后一个【(而不是整个缓冲区的):否则窗口边界上跨切的标记
+              // 会因为后面还有别的【而漏掉保护,被劈开推出、在前端拼回成完整标记
+              const lastOpen = full.lastIndexOf("【", visibleEnd - 1);
               if (lastOpen >= sentLen) {
                 const close = full.indexOf("】", lastOpen);
                 if (close === -1 || close >= visibleEnd) {
-                  visibleEnd = Math.min(visibleEnd, lastOpen);
+                  visibleEnd = lastOpen;
                 }
               }
             }
