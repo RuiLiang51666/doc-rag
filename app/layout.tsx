@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "开发者文档",
-  description: "开发者文档站 · 内置 AI 智能助手，基于本地文档检索即时问答",
+  title: "智能问答 · 梁瑞",
+  description: "基于本地知识库的 RAG 智能问答 demo：流式响应、查询改写、来源标注。",
 };
 
 export default function RootLayout({

@@ -2,43 +2,10 @@
 
 import Assistant from "./components/Assistant";
 
-/* 全站无死链:每个可点击位都映射为一个与知识库内容对齐的问题,点击即转投智能助手。
-   知识库主题覆盖:产品介绍/快速开始/部署/SQL 参考/开发接入/运维/工具/最佳实践/版本说明 */
-const NAV = [
-  { label: "产品介绍", prompt: "请根据本站文档，介绍一下本产品是什么，它的核心特性与典型应用场景有哪些？" },
-  { label: "部署指南", prompt: "请根据本站文档，总结本产品支持的部署方式，以及部署前需要满足的环境要求。" },
-  { label: "最佳实践", prompt: "请根据本站文档，介绍有哪些最佳实践，例如高可用部署或 JDBC 批量写入的建议做法。" },
-  { label: "版本说明", prompt: "请根据本站文档，介绍最新版本包含的主要新特性与重要变更。" },
-];
-
-const CONSOLE_PROMPT = "请根据本站文档，介绍本产品提供了哪些数据库管理与开发工具，分别适用于什么场景？";
-
-const CARDS = [
-  {
-    title: "快速开始",
-    desc: "几分钟内完成环境准备与安装，跑通你的第一个示例。",
-    tag: "Guide",
-    prompt: "请根据本站文档，给我一份快速开始指南：环境准备、安装步骤和第一个可运行的示例。",
-  },
-  {
-    title: "开发接入",
-    desc: "通过 JDBC 等驱动连接数据库，快速完成应用开发。",
-    tag: "Develop",
-    prompt: "请根据本站文档，说明如何通过 JDBC 连接数据库并完成建表与数据写入，尽量给出示例代码。",
-  },
-  {
-    title: "运维管理",
-    desc: "部署、监控、备份与故障排查的运维指南。",
-    tag: "Ops",
-    prompt: "请根据本站文档，总结部署、监控、备份与故障排查的关键运维要点。",
-  },
-  {
-    title: "SQL 参考",
-    desc: "完整的 SQL 语法、数据类型与函数说明，随用随查。",
-    tag: "Reference",
-    prompt: "请根据本站文档，概述本产品支持的 SQL 语法类别与常用语句，并举例说明。",
-  },
-];
+/* 页面可点击位映射为与知识库内容对齐的问题,点击即转投智能助手 */
+const INTRO_PROMPT = "请根据本站文档，介绍一下本产品是什么，它的核心特性与典型应用场景有哪些？";
+const QUICKSTART_PROMPT = "请根据本站文档，给我一份快速开始指南：环境准备、安装步骤和第一个可运行的示例。";
+const SQL_PROMPT = "请根据本站文档，概述本产品支持的 SQL 语法类别与常用语句，并举例说明。";
 
 /* 交互特性(展示助手能力,非链接) */
 const FEATURES = [
@@ -80,10 +47,13 @@ const FEATURES = [
   },
 ];
 
-/* 作品集主页(本 demo 由梁瑞的作品集页跳转而来,提供返回入口) */
+/* 作品集主页(本 demo 由梁瑞的作品集页跳转而来,顶栏与作品集各页一致) */
 const PORTFOLIO_URL = "https://liangrui.vercel.app/";
-/* hero 副按钮固定指向「SQL 参考」,按 tag 取以免卡片顺序调整后错位 */
-const SQL_PROMPT = CARDS.find((c) => c.tag === "Reference")!.prompt;
+const SITE_LINKS = [
+  { label: "首页", href: PORTFOLIO_URL },
+  { label: "文档同步 Agent", href: "https://liangrui.vercel.app/docs-agent.html" },
+  { label: "文档质检", href: "https://liangrui.vercel.app/qc.html" },
+];
 
 function ask(q: string, e?: React.MouseEvent) {
   e?.preventDefault();
@@ -99,21 +69,19 @@ export default function Home() {
         style={{ borderColor: "var(--border)", background: "rgba(247,246,240,0.88)" }}
       >
         <div className="mx-auto flex h-[72px] max-w-[1120px] items-center justify-between px-6 md:px-8">
-          {/* 品牌区即「返回主页」入口:本 demo 由作品集页跳转而来,点击回到作品集主页 */}
           <a
             href={PORTFOLIO_URL}
             title="返回作品集主页"
-            className="text-[21px] font-bold transition-opacity hover:opacity-80"
+            className="text-[22px] font-bold tracking-[0.02em] transition-opacity hover:opacity-80"
             style={{ fontFamily: "var(--serif)", color: "var(--accent)" }}
           >
-            开发者文档
+            梁瑞
           </a>
-          <nav className="hidden items-center gap-8 sm:flex">
-            {NAV.map((n) => (
+          <nav className="flex items-center gap-5 sm:gap-9">
+            {SITE_LINKS.map((n) => (
               <a
                 key={n.label}
-                href="#"
-                onClick={(e) => ask(n.prompt, e)}
+                href={n.href}
                 className="text-[13px] tracking-[0.05em] transition-colors hover:text-[var(--accent)]"
                 style={{ fontFamily: "var(--mono)", color: "var(--muted)" }}
               >
@@ -121,14 +89,6 @@ export default function Home() {
               </a>
             ))}
           </nav>
-          <a
-            href="#"
-            onClick={(e) => ask(CONSOLE_PROMPT, e)}
-            className="t-label rounded-full px-6 py-2.5 text-white transition-colors hover:bg-[var(--accent-hover)]"
-            style={{ background: "var(--accent)" }}
-          >
-            管理工具
-          </a>
         </div>
       </header>
 
@@ -151,12 +111,12 @@ export default function Home() {
             {/* 文案连写在单个表达式里,避免 JSX 换行在中文句中引入多余空格 */}
             {"从入门指南到 SQL 参考，结构化的文档与详实的示例助你快速上手。遇到问题？无需四处翻找，点击右下角"}
             <span style={{ color: "var(--accent)" }}>「智能助手」</span>
-            {"，或直接点击页面任意导航、按钮与卡片，获取基于本地向量库 RAG 系统的即时解答。"}
+            {"，或直接点击页面上的任意按钮，获取基于本地向量库 RAG 系统的即时解答。"}
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-4">
             <a
               href="#"
-              onClick={(e) => ask(CARDS[0].prompt, e)}
+              onClick={(e) => ask(QUICKSTART_PROMPT, e)}
               className="t-label rounded-full px-7 py-3.5 text-white transition-colors hover:bg-[var(--accent-hover)]"
               style={{ background: "var(--accent)" }}
             >
@@ -178,96 +138,44 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 01 核心板块(带状底) */}
+      {/* 01 交互特性(带状底) */}
       <section
         className="border-y py-16 md:py-20"
         style={{ borderColor: "var(--border)", background: "rgba(0,91,77,0.03)" }}
       >
         <div className="mx-auto max-w-[1120px] px-6 md:px-8">
-          <div className="mb-10">
+          <div className="mx-auto mb-12 max-w-2xl text-center">
             <span className="t-label mb-3 block" style={{ color: "var(--accent)" }}>
-              01 · CORE SECTIONS
+              01 · INTERACTION
             </span>
             <h2 className="text-[1.7rem] font-semibold sm:text-[1.9rem]" style={{ color: "var(--foreground)" }}>
-              快速上手指南
+              简化知识发现之旅
             </h2>
           </div>
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {CARDS.map((c) => (
-              <button
-                key={c.title}
-                type="button"
-                onClick={() => ask(c.prompt)}
-                className="group flex h-full cursor-pointer flex-col rounded-[2px] border p-7 text-left backdrop-blur-[4px] transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_10px_30px_-10px_rgba(0,91,77,0.15)]"
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+            {FEATURES.map((f) => (
+              <div
+                key={f.title}
+                className="flex items-start gap-6 rounded-[2px] border p-7 transition-colors duration-300 hover:bg-white/40 md:p-8"
                 style={{ borderColor: "var(--border)", background: "var(--vellum)" }}
               >
-                <span
-                  className="text-[11px] uppercase tracking-[0.08em]"
-                  style={{ fontFamily: "var(--mono)", color: "rgba(0,91,77,0.45)" }}
+                <div
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[2px]"
+                  style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
                 >
-                  {c.tag}
-                </span>
-                <h3 className="mt-4 text-[1.25rem] font-semibold" style={{ color: "var(--foreground)" }}>
-                  {c.title}
-                </h3>
-                <p className="mt-2.5 text-[14px]" style={{ color: "var(--muted)", lineHeight: 1.65 }}>
-                  {c.desc}
-                </p>
-                <span
-                  className="mt-auto inline-flex items-center gap-1.5 pt-6 text-[12px] font-medium uppercase tracking-[0.08em]"
-                  style={{ fontFamily: "var(--mono)", color: "var(--accent)" }}
-                >
-                  向助手提问
-                  <span className="transition-transform duration-200 ease-out group-hover:translate-x-1">→</span>
-                </span>
-              </button>
+                  {f.icon}
+                </div>
+                <div>
+                  <h3 className="text-[1.2rem] font-semibold" style={{ color: "var(--foreground)" }}>
+                    {f.title}
+                  </h3>
+                  <p className="mt-2 text-[14px]" style={{ color: "var(--muted)", lineHeight: 1.65 }}>
+                    {f.desc}
+                  </p>
+                </div>
+              </div>
             ))}
           </div>
-          {/* 引导横幅:oxblood 左边线 + 衬线引文 */}
-          <div
-            className="mt-12 rounded-[2px] border p-7 md:p-8"
-            style={{ borderColor: "var(--border)", borderLeft: "4px solid var(--oxblood)", background: "var(--surface-muted)" }}
-          >
-            <p className="text-[1.15rem] italic sm:text-[1.3rem]" style={{ fontFamily: "var(--serif)", color: "var(--oxblood)", lineHeight: 1.6 }}>
-              「遇到问题？无需四处翻找 —— 页面上的每一个导航、按钮与卡片都可以点击，你的问题会直接转给智能助手。」
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* 02 交互特性 */}
-      <section className="mx-auto max-w-[1120px] px-6 py-16 md:px-8 md:py-20">
-        <div className="mx-auto mb-12 max-w-2xl text-center">
-          <span className="t-label mb-3 block" style={{ color: "var(--accent)" }}>
-            02 · INTERACTION
-          </span>
-          <h2 className="text-[1.7rem] font-semibold sm:text-[1.9rem]" style={{ color: "var(--foreground)" }}>
-            简化知识发现之旅
-          </h2>
-        </div>
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          {FEATURES.map((f) => (
-            <div
-              key={f.title}
-              className="flex items-start gap-6 rounded-[2px] border p-7 transition-colors duration-300 hover:bg-white/40 md:p-8"
-              style={{ borderColor: "var(--border)" }}
-            >
-              <div
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[2px]"
-                style={{ background: "var(--accent-soft)", color: "var(--accent)" }}
-              >
-                {f.icon}
-              </div>
-              <div>
-                <h3 className="text-[1.2rem] font-semibold" style={{ color: "var(--foreground)" }}>
-                  {f.title}
-                </h3>
-                <p className="mt-2 text-[14px]" style={{ color: "var(--muted)", lineHeight: 1.65 }}>
-                  {f.desc}
-                </p>
-              </div>
-            </div>
-          ))}
         </div>
       </section>
 
@@ -294,7 +202,7 @@ export default function Home() {
             <div className="mt-9 flex flex-col items-center justify-center gap-5 md:flex-row">
               <a
                 href="#"
-                onClick={(e) => ask(NAV[0].prompt, e)}
+                onClick={(e) => ask(INTRO_PROMPT, e)}
                 className="t-label rounded-full bg-white px-9 py-4 transition-transform duration-300 hover:scale-105"
                 style={{ color: "var(--accent)" }}
               >
@@ -316,10 +224,10 @@ export default function Home() {
         <div className="mx-auto flex max-w-[1120px] flex-wrap items-center justify-between gap-6 px-6 py-12 md:px-8">
           <div>
             <div className="text-[22px] font-bold" style={{ fontFamily: "var(--serif)", color: "var(--accent)" }}>
-              开发者文档
+              梁瑞
             </div>
             <div className="mt-1.5 text-[10.5px] tracking-[0.05em]" style={{ fontFamily: "var(--mono)", color: "var(--muted)" }}>
-              DOC-RAG DEMO · 梁瑞 · 技术写作的 AI 实践
+              © 2026 LIANG RUI · 技术写作的 AI 实践
             </div>
           </div>
           <div className="flex gap-8">
