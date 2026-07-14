@@ -11,6 +11,8 @@ import {
 // 本地模型推理 + 外部 LLM 调用，需 Node runtime
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+// 流式生成通常 20-40s,Vercel 需显式放宽时限(默认 10s)
+export const maxDuration = 60;
 
 // 流式协议：先逐块推回答正文纯文本，最后一行推 META 标记 + JSON（含 sources）
 const META_SENTINEL = "\n<<<META>>>";

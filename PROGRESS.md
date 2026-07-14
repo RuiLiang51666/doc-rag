@@ -259,3 +259,5 @@ cd ~/doc-rag
 **验证**:dev 服务器热更新后,首页无 console 报错、无横向溢出;字体/纸纹/主色计算值全部正确;点卡片 → 助手弹出 → 问题发送 → RAG 流式回答正常。
 
 **补充(同日)**:删除未使用的 Geist 本地字体(layout.tsx 的 localFont + app/fonts/),换肤后已无引用,省 ~100KB 加载;`next build` 通过(首页 First Load JS 129KB)。
+
+**Vercel 迁移准备(2026-07-14)**:检索模型改用 q8 量化版(23MB,与 fp32 索引 Top-1 全一致)并随仓库提交于 models/,运行时禁下载;next.config 配函数打包追踪(模型+索引进包、排除非 Linux ONNX 二进制);/api/ask maxDuration=60;删无引用的 @xenova/transformers。部署目标:Vercel 第二项目,冷启动 ~60s → 秒级。

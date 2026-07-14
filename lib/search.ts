@@ -29,9 +29,12 @@ const MODEL_NAME = "Xenova/bge-small-zh-v1.5";
 // BGE 检索：query 需加指令前缀，passage（文档块）不加
 const QUERY_PREFIX = "为这个句子生成表示以用于检索相关文章：";
 
-// 模型缓存目录，与 build-index 脚本保持一致
-env.cacheDir = path.join(ROOT, ".model-cache");
+// 模型随仓库打包在 models/(Vercel serverless 只读文件系统,禁止运行时下载)。
+// 检索用 q8 量化模型(23MB vs fp32 90MB);索引仍是 fp32 构建,已实测两者
+// Top-1 完全一致、Top-5 仅近分项微调,对 Top-8 召回无影响。
+env.cacheDir = path.join(ROOT, "models");
 env.allowLocalModels = true;
+env.allowRemoteModels = false;
 
 let _index: IndexFile | null = null;
 let _extractor: FeatureExtractionPipeline | null = null;
@@ -49,7 +52,7 @@ function getIndex(): IndexFile {
 /** 懒加载本地 embedding 模型（单例，避免重复加载） */
 async function getExtractor(): Promise<FeatureExtractionPipeline> {
   if (_extractor) return _extractor;
-  _extractor = await pipeline("feature-extraction", MODEL_NAME, { device: "cpu" });
+  _extractor = await pipeline("feature-extraction", MODEL_NAME, { device: "cpu", dtype: "q8" });
   return _extractor;
 }
 

@@ -5,6 +5,8 @@ import { search } from "@/lib/search";
 export const runtime = "nodejs";
 // 不缓存，每次实时检索
 export const dynamic = "force-dynamic";
+// 冷启动需加载 q8 模型(数秒),给足余量
+export const maxDuration = 30;
 
 export async function POST(req: NextRequest) {
   try {
