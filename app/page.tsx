@@ -5,7 +5,6 @@ import Assistant from "./components/Assistant";
 /* 页面可点击位映射为与知识库内容对齐的问题,点击即转投智能助手 */
 const INTRO_PROMPT = "请根据本站文档，介绍一下本产品是什么，它的核心特性与典型应用场景有哪些？";
 const QUICKSTART_PROMPT = "请根据本站文档，给我一份快速开始指南：环境准备、安装步骤和第一个可运行的示例。";
-const SQL_PROMPT = "请根据本站文档，概述本产品支持的 SQL 语法类别与常用语句，并举例说明。";
 
 /* 交互特性(展示助手能力,非链接) */
 const FEATURES = [
@@ -109,9 +108,9 @@ export default function Home() {
           </h1>
           <p className="mt-6 max-w-[540px] text-[17px]" style={{ color: "var(--muted)", lineHeight: 1.7 }}>
             {/* 文案连写在单个表达式里,避免 JSX 换行在中文句中引入多余空格 */}
-            {"从入门指南到 SQL 参考，结构化的文档与详实的示例助你快速上手。遇到问题？无需四处翻找，点击右下角"}
+            {"从入门指南到 SQL 参考，遇到问题无需四处翻找。点击右下角"}
             <span style={{ color: "var(--accent)" }}>「智能助手」</span>
-            {"，或直接点击页面上的任意按钮，获取基于本地向量库 RAG 系统的即时解答。"}
+            {"，获取基于本地向量库 RAG 系统的即时解答：流式响应、查询改写、来源可溯。"}
           </p>
           <div className="mt-9 flex flex-wrap items-center gap-4">
             <a
@@ -123,12 +122,13 @@ export default function Home() {
               快速开始
             </a>
             <a
-              href="#"
-              onClick={(e) => ask(SQL_PROMPT, e)}
+              href="https://github.com/RuiLiang51666/doc-rag"
+              target="_blank"
+              rel="noopener"
               className="t-label rounded-full border px-7 py-3.5 transition-colors hover:bg-[var(--accent-soft)]"
               style={{ borderColor: "var(--border)", color: "var(--accent)" }}
             >
-              查看 SQL 参考
+              查看源码
             </a>
           </div>
         </div>
@@ -145,9 +145,6 @@ export default function Home() {
       >
         <div className="mx-auto max-w-[1120px] px-6 md:px-8">
           <div className="mx-auto mb-12 max-w-2xl text-center">
-            <span className="t-label mb-3 block" style={{ color: "var(--accent)" }}>
-              01 · INTERACTION
-            </span>
             <h2 className="text-[1.7rem] font-semibold sm:text-[1.9rem]" style={{ color: "var(--foreground)" }}>
               简化知识发现之旅
             </h2>
@@ -156,7 +153,7 @@ export default function Home() {
             {FEATURES.map((f) => (
               <div
                 key={f.title}
-                className="flex items-start gap-6 rounded-[2px] border p-7 transition-colors duration-300 hover:bg-white/40 md:p-8"
+                className="flex items-start gap-6 rounded-[2px] border p-7 transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_10px_30px_-10px_rgba(0,91,77,0.22)] md:p-8"
                 style={{ borderColor: "var(--border)", background: "var(--vellum)" }}
               >
                 <div
@@ -199,7 +196,7 @@ export default function Home() {
             <p className="mx-auto mt-5 max-w-xl text-[16px] opacity-80" style={{ lineHeight: 1.7 }}>
               静态的知识库，从此变成有问必答的专家伙伴。
             </p>
-            <div className="mt-9 flex flex-col items-center justify-center gap-5 md:flex-row">
+            <div className="mt-9 flex justify-center">
               <a
                 href="#"
                 onClick={(e) => ask(INTRO_PROMPT, e)}
@@ -207,12 +204,6 @@ export default function Home() {
                 style={{ color: "var(--accent)" }}
               >
                 立即提问
-              </a>
-              <a
-                href={PORTFOLIO_URL}
-                className="t-label border-b border-white/30 pb-1 text-white transition-colors hover:border-white"
-              >
-                返回作品集
               </a>
             </div>
           </div>
@@ -236,7 +227,7 @@ export default function Home() {
               className="text-[12px] uppercase tracking-[0.1em] transition-colors hover:text-[var(--accent)]"
               style={{ fontFamily: "var(--mono)", color: "var(--muted)" }}
             >
-              返回作品集
+              首页
             </a>
             <a
               href="https://github.com/RuiLiang51666/doc-rag"

@@ -184,7 +184,7 @@ export default function Assistant() {
           className="fixed bottom-[92px] right-5 z-50 rounded-xl border bg-white px-3.5 py-2 text-left text-[12.5px] leading-relaxed shadow-[0_8px_24px_rgba(15,23,42,0.12)]"
           style={{ borderColor: "var(--border)", color: "var(--foreground)", maxWidth: "240px" }}
         >
-          试试点击我，或点击页面上的任意按钮，直接对文档提问！👇
+          试试点击我，直接对文档提问！👇
           <span
             className="absolute -bottom-1.5 right-6 h-3 w-3 rotate-45 border-b border-r bg-white"
             style={{ borderColor: "var(--border)" }}
