@@ -9,11 +9,14 @@ const nextConfig = {
       "/api/ask": ["./models/**/*", "./data/embeddings.json"],
       "/api/search": ["./models/**/*", "./data/embeddings.json"],
     },
-    // 只保留 Linux 的 ONNX 运行时二进制,darwin/win32(约 60MB)不进函数包
+    // 只保留 linux/x64 的 ONNX 运行时二进制(Vercel 目标平台),其余平台约 52MB 不进函数包。
+    // 注意:onnxruntime-node 嵌套安装在 @huggingface/transformers/node_modules 下,napi 版本目录用 ** 通配。
+    // 该配置只影响部署打包追踪,本地运行仍直接用 node_modules,不受影响。
     outputFileTracingExcludes: {
       "*": [
-        "node_modules/onnxruntime-node/bin/napi-v3/darwin/**",
-        "node_modules/onnxruntime-node/bin/napi-v3/win32/**",
+        "node_modules/@huggingface/transformers/node_modules/onnxruntime-node/bin/**/darwin/**",
+        "node_modules/@huggingface/transformers/node_modules/onnxruntime-node/bin/**/win32/**",
+        "node_modules/@huggingface/transformers/node_modules/onnxruntime-node/bin/**/linux/arm64/**",
       ],
     },
   },
