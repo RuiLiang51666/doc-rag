@@ -296,7 +296,36 @@ export default function Assistant() {
                                 prose-a:text-[var(--accent)]
                                 prose-code:rounded prose-code:bg-[var(--accent-soft)] prose-code:px-1 prose-code:py-0.5 prose-code:text-[var(--accent)] prose-code:before:content-none prose-code:after:content-none
                                 prose-pre:bg-[#013128] prose-pre:text-[#d9efe6] prose-pre:text-[12px]">
-                  <ReactMarkdown>{answer}</ReactMarkdown>
+                  {/* 回答里的链接多为知识库内部相对路径(../xx.md),站外无法打开:
+                      外部 http 链接照常新开页;内部链接转成「继续追问」入口,点击即向助手提问 */}
+                  <ReactMarkdown
+                    components={{
+                      a: (props) => {
+                        const { href, children } = props as { href?: string; children?: React.ReactNode };
+                        if (href && /^https?:\/\//.test(href)) {
+                          return (
+                            <a href={href} target="_blank" rel="noopener noreferrer">
+                              {children}
+                            </a>
+                          );
+                        }
+                        const topic = (Array.isArray(children) ? children.join("") : String(children ?? "")).trim();
+                        return (
+                          <button
+                            type="button"
+                            title={`向助手追问「${topic}」`}
+                            onClick={() => topic && handleAsk(`请根据本站文档，详细介绍「${topic}」。`)}
+                            className="cursor-pointer border-none bg-transparent p-0 font-inherit underline decoration-dashed underline-offset-2"
+                            style={{ color: "var(--accent)", font: "inherit" }}
+                          >
+                            {children}
+                          </button>
+                        );
+                      },
+                    }}
+                  >
+                    {answer}
+                  </ReactMarkdown>
                 </div>
               </div>
             )}
