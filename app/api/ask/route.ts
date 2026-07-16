@@ -5,6 +5,7 @@ import {
   rewriteQueryLocal,
   parseUsedIndices,
   stripFragmentMarkers,
+  trimHistory,
   USED_MARKER_KEYWORD,
 } from "@/lib/llm";
 
@@ -19,9 +20,11 @@ const META_SENTINEL = "\n<<<META>>>";
 
 export async function POST(req: NextRequest) {
   let query: string;
+  let history: ReturnType<typeof trimHistory>;
   try {
     const body = await req.json();
     query = body.query;
+    history = trimHistory(body.history);
     if (!query || typeof query !== "string" || !query.trim()) {
       return NextResponse.json({ error: "问题不能为空" }, { status: 400 });
     }
@@ -32,9 +35,17 @@ export async function POST(req: NextRequest) {
   const original = query.trim();
   const tStart = performance.now();
 
-  // 1. 查询改写（本地规则，零网络调用，基本瞬时）
+  // 1. 查询改写（本地规则，零网络调用，基本瞬时）。
+  //    多轮追问常带指代(「第二种呢?」),单独向量化召回极差:
+  //    把上一条用户问题和上一条回答的开头拼进检索文本——指代的对象
+  //    (如「第二种」=集群部署)通常出现在上一条回答的列表里,而不在问题里。
   const tRw0 = performance.now();
-  const searchQuery = rewriteQueryLocal(original);
+  const lastUserQ = [...history].reverse().find((t) => t.role === "user")?.content ?? "";
+  const lastAnswer = [...history].reverse().find((t) => t.role === "assistant")?.content ?? "";
+  const retrievalText = lastUserQ
+    ? `${lastUserQ.slice(0, 200)}\n${lastAnswer.slice(0, 300)}\n${original}`
+    : original;
+  const searchQuery = rewriteQueryLocal(retrievalText);
   const rewriteMs = performance.now() - tRw0;
 
   // 2. 用改写后的 query 检索 Top 8（分别计时：向量化 / 检索打分）
@@ -49,10 +60,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `检索阶段出错：${msg}` }, { status: 500 });
   }
 
-  // 3. 流式生成回答（喂的是原始问题，不是改写后的）
+  // 3. 流式生成回答（喂的是原始问题，不是改写后的;历史轮注入 messages 支撑指代追问）
   let completion;
   try {
-    completion = await createAnswerStream(original, sources);
+    completion = await createAnswerStream(original, sources, history);
   } catch (err) {
     return NextResponse.json({ error: friendlyLlmError(err), sources }, { status: 502 });
   }

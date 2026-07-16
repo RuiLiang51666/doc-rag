@@ -100,7 +100,12 @@ const SYSTEM_PROMPT = `你是 KWDB 数据库文档的智能问答助手。请严
    引用片段: 1, 3
    即列出你回答时**实际引用了内容**的片段编号（只列真正用到的，不要把所有片段都列上）。
    如果你回答的是「根据现有文档无法找到相关信息。」或没有用到任何片段，则这一行必须输出：
-   引用片段: 无`;
+   引用片段: 无
+5. 对话可能有多轮。当用户的追问指代前文（如「第二种」「它的前置条件」「那怎么配置」）时，
+   结合对话历史理解所指对象；但事实内容仍只能来自**本轮**提供的文档片段与你此前回答中已明确给出的信息，
+   历史中未出现、片段中也没有的内容依然视为「无法找到相关信息」。
+   序数指代（「第一种」「第二种」）**以你上一条回答中列举的顺序为准**：先确定所指对象并在回答开头点明
+   （如「第二种方式（集群部署）…」），再基于文档片段回答；若片段未覆盖该对象，按规则 2 处理。`;
 
 const USED_RE = /引用片段[:：]\s*(.+)\s*$/m;
 
@@ -122,8 +127,32 @@ function cleanFragmentMarkers(text: string): string {
     .trim();
 }
 
-/** 组装生成回答用的 messages */
-function buildAnswerMessages(question: string, chunks: SearchResult[]) {
+/** 多轮对话的一条历史消息(前端透传,服务端裁剪后注入) */
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+/** 历史裁剪:只留最近 3 轮(6 条),单条截 1200 字——控 token,同时足够支撑指代追问 */
+export function trimHistory(history: unknown): ChatTurn[] {
+  if (!Array.isArray(history)) return [];
+  return history
+    .filter(
+      (t): t is ChatTurn =>
+        !!t &&
+        (t.role === "user" || t.role === "assistant") &&
+        typeof t.content === "string" &&
+        !!t.content.trim()
+    )
+    .slice(-6)
+    .map((t) => ({
+      role: t.role,
+      content: t.content.length > 1200 ? t.content.slice(0, 1200) + "…" : t.content,
+    }));
+}
+
+/** 组装生成回答用的 messages(历史轮夹在 system 与本轮用户消息之间) */
+function buildAnswerMessages(question: string, chunks: SearchResult[], history: ChatTurn[] = []) {
   const context = buildContext(chunks);
   const userPrompt = `以下是从 KWDB 文档中检索到的相关片段：
 
@@ -136,6 +165,7 @@ ${context}
 请根据上述文档片段回答。`;
   return [
     { role: "system" as const, content: SYSTEM_PROMPT },
+    ...history,
     { role: "user" as const, content: userPrompt },
   ];
 }
@@ -182,13 +212,17 @@ export async function generateAnswer(
  * 流式生成回答。返回智谱的流式响应（async iterable），
  * 由调用方逐块读取 delta.content。引用标记的解析/剥离在调用方完成。
  */
-export async function createAnswerStream(question: string, chunks: SearchResult[]) {
+export async function createAnswerStream(
+  question: string,
+  chunks: SearchResult[],
+  history: ChatTurn[] = []
+) {
   const client = getClient();
   return client.chat.completions.create({
     model: MODEL,
     temperature: 0.2,
     stream: true,
-    messages: buildAnswerMessages(question, chunks),
+    messages: buildAnswerMessages(question, chunks, history),
   });
 }
 

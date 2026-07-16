@@ -10,28 +10,50 @@ interface SearchResult {
   heading: string;
 }
 
+/** 对话消息:来源挂在各自的助手消息上 */
+interface ChatMsg {
+  role: "user" | "assistant";
+  content: string;
+  sources?: SearchResult[];
+}
+
 /** 兜底清洗内部片段标记(与服务端同款):流式累积缓冲会把跨块劈开的标记重新拼完整,
- *  每次 setAnswer 前在完整文本上再清一遍,即使服务端漏网也不会呈现给用户 */
+ *  每次上屏前在完整文本上再清一遍,即使服务端漏网也不会呈现给用户 */
 function stripMarkers(s: string): string {
   return s
     .replace(/[【\[]\s*片段[\s\d０-９，,、和及片段]*[】\]]/g, "")
     .replace(/(根据|参见|见|来自|依据)?\s*片段\s*[\d０-９]+(\s*[、，,和及]\s*[\d０-９]+)*/g, "");
 }
 
+const PROSE_CLS =
+  "prose prose-sm max-w-none " +
+  "prose-headings:text-[var(--foreground)] prose-p:text-[var(--foreground)] " +
+  "prose-li:text-[var(--foreground)] prose-strong:text-[var(--foreground)] " +
+  "prose-a:text-[var(--accent)] " +
+  "prose-code:rounded prose-code:bg-[var(--accent-soft)] prose-code:px-1 prose-code:py-0.5 prose-code:text-[var(--accent)] prose-code:before:content-none prose-code:after:content-none " +
+  "prose-pre:bg-[#013128] prose-pre:text-[#d9efe6] prose-pre:text-[12px]";
+
 export default function Assistant() {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState("");
-  const [sources, setSources] = useState<SearchResult[]>([]);
+  const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");        // 后端业务错误(确定性,如问题为空/LLM 报错):红色提示
-  const [failed, setFailed] = useState(false);   // 重试仍失败(网络/唤醒超时):友好兜底 + 重试按钮
-  const [waking, setWaking] = useState(false);   // 正在重试(冷启动/偶发断连):显示"服务正在唤醒"
-  const [openIdx, setOpenIdx] = useState<number | null>(null);
+  const [failed, setFailed] = useState(false);   // 重试仍失败(网络/超时):友好兜底 + 重试按钮
+  const [waking, setWaking] = useState(false);   // 正在自动重试:显示提示
+  const [openSrc, setOpenSrc] = useState<string | null>(null); // 展开的来源,键 `${消息下标}-${来源下标}`
   const [bouncing, setBouncing] = useState(false);
   const [tip, setTip] = useState(false);
   const loadingRef = useRef(false);
   const lastAskedRef = useRef("");               // 供"重试"按钮重发上一个问题
+  // 事件监听器只在挂载时注册一次,闭包里的 state 是旧值:消息列表以 ref 为准
+  const messagesRef = useRef<ChatMsg[]>([]);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+
+  function commitMessages(next: ChatMsg[]) {
+    messagesRef.current = next;
+    setMessages(next);
+  }
 
   /* 页面卡片派发 doc-rag:ask 事件 → 展开面板、预填问题并自动发送(死链拦截联动) */
   useEffect(() => {
@@ -55,23 +77,46 @@ export default function Assistant() {
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
+  /* 新消息/流式更新时自动滚到底部 */
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, loading, failed, error]);
+
   // Vercel serverless 冷启动为秒级(模型加载 3-5s),30s 已含充分余量;超时/断连/网关错误自动重试
   const MAX_ATTEMPTS = 3; // 1 正常 + 2 重试
   const ATTEMPT_TIMEOUT = 30_000;
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+  /** 更新(或创建)线程末尾的助手草稿消息 */
+  function updateAssistantDraft(text: string) {
+    const cur = messagesRef.current;
+    const last = cur[cur.length - 1];
+    if (last && last.role === "assistant") {
+      commitMessages([...cur.slice(0, -1), { ...last, content: text }]);
+    } else {
+      commitMessages([...cur, { role: "assistant", content: text }]);
+    }
+  }
+
+  /** 给线程末尾的助手消息挂来源 */
+  function attachSources(sources: SearchResult[]) {
+    const cur = messagesRef.current;
+    const last = cur[cur.length - 1];
+    if (last && last.role === "assistant") {
+      commitMessages([...cur.slice(0, -1), { ...last, sources }]);
+    }
+  }
+
   /**
    * 单次请求 + 流式读取。
    * 正常返回 = 已处理完成(成功,或后端确定性业务错误,均已上屏),不再重试;
-   * 抛出异常 = 可重试错误(网络/超时/网关 5xx/空流)。
+   * 抛出异常 = 可重试错误(网络/超时/网关 5xx/空流),抛出前会清掉本次的半截草稿。
    */
-  async function runOnce(q: string): Promise<void> {
-    setAnswer("");
-    setSources([]);
-    setOpenIdx(null);
-
+  async function runOnce(q: string, history: { role: "user" | "assistant"; content: string }[]): Promise<void> {
     const ctrl = new AbortController();
     let firstByte = false;
+    let draftPushed = false;
     // 只守护"连接 + 首字节":一旦开始出字就清掉,不误杀正常的长生成
     const timer = setTimeout(() => {
       if (!firstByte) ctrl.abort();
@@ -81,7 +126,7 @@ export default function Assistant() {
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: q }),
+        body: JSON.stringify({ query: q, history }),
         signal: ctrl.signal,
       });
 
@@ -91,11 +136,10 @@ export default function Assistant() {
       if (!res.ok && ctype.includes("application/json")) {
         const data = await res.json();
         setError(data.error || "请求失败");
-        if (data.sources) setSources(data.sources);
         return;
       }
 
-      // 网关/唤醒错误(502/503/504,通常是 HTML 或空):当作可重试错误抛出,不当答案渲染
+      // 网关错误(502/503/504,通常是 HTML 或空):当作可重试错误抛出,不当答案渲染
       if (!res.ok || !res.body) {
         throw new Error(`gateway_${res.status}`);
       }
@@ -112,21 +156,29 @@ export default function Assistant() {
         if (!firstByte) {
           firstByte = true;
           clearTimeout(timer);
-          setWaking(false); // 已开始出字,撤下"唤醒中"提示
+          setWaking(false); // 已开始出字,撤下重试提示
         }
         buffer += decoder.decode(value, { stream: true });
         const idx = buffer.indexOf(META);
-        setAnswer(stripMarkers(idx === -1 ? buffer : buffer.slice(0, idx)));
+        const visible = stripMarkers(idx === -1 ? buffer : buffer.slice(0, idx));
+        if (visible.trim()) {
+          updateAssistantDraft(visible);
+          draftPushed = true;
+        }
       }
 
       // 处理结尾的 META（sources / error）
       const idx = buffer.indexOf(META);
       if (idx !== -1) {
-        setAnswer(stripMarkers(buffer.slice(0, idx)));
+        const visible = stripMarkers(buffer.slice(0, idx));
+        if (visible.trim()) {
+          updateAssistantDraft(visible);
+          draftPushed = true;
+        }
         try {
           const meta = JSON.parse(buffer.slice(idx + META.length));
           if (meta.error) setError(meta.error);
-          if (meta.sources) setSources(meta.sources);
+          if (meta.sources) attachSources(meta.sources);
         } catch {
           /* META 解析失败则忽略，回答正文已展示 */
         }
@@ -134,12 +186,19 @@ export default function Assistant() {
 
       // 流开了但整段为空(极端异常):当作失败以便重试
       if (!buffer.trim()) throw new Error("empty_stream");
+    } catch (err) {
+      // 本次尝试的半截草稿不留在线程里,重试会重新生成
+      if (draftPushed) {
+        const cur = messagesRef.current;
+        if (cur[cur.length - 1]?.role === "assistant") commitMessages(cur.slice(0, -1));
+      }
+      throw err;
     } finally {
       clearTimeout(timer);
     }
   }
 
-  async function handleAsk(qOverride?: string) {
+  async function handleAsk(qOverride?: string, isRetry = false) {
     const q = (qOverride ?? question).trim();
     if (!q || loadingRef.current) return;
     loadingRef.current = true;
@@ -149,31 +208,74 @@ export default function Assistant() {
     setError("");
     setFailed(false);
     setWaking(false);
-    setAnswer("");
-    setSources([]);
-    setOpenIdx(null);
+    setQuestion("");
+
+    // 历史 = 本问之前的完整线程(重试时线程末尾已是这条用户消息,不再追加)
+    let history = messagesRef.current.map(({ role, content }) => ({ role, content }));
+    if (isRetry && history[history.length - 1]?.role === "user") {
+      history = history.slice(0, -1);
+    } else {
+      commitMessages([...messagesRef.current, { role: "user", content: q }]);
+    }
 
     try {
       for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-        if (attempt > 1) setWaking(true); // 第 2 次起提示"服务正在唤醒"
+        if (attempt > 1) setWaking(true); // 第 2 次起提示自动重试中
         try {
-          await runOnce(q);
+          await runOnce(q, history);
           return; // 已完成(成功或业务错误),结束
         } catch (err) {
           if (attempt === MAX_ATTEMPTS) throw err; // 重试用尽,交给外层兜底
-          await sleep(600 * attempt); // 递增退避,给实例唤醒/恢复的时间
+          await sleep(600 * attempt); // 递增退避
         }
       }
     } catch {
       // 网络/超时/网关等瞬时故障重试仍失败:友好兜底 + 重试按钮,不裸奔 network error
       setFailed(true);
-      setAnswer("");
     } finally {
       setLoading(false);
       setWaking(false);
       loadingRef.current = false;
     }
   }
+
+  function newConversation() {
+    if (loadingRef.current) return;
+    commitMessages([]);
+    setError("");
+    setFailed(false);
+    setOpenSrc(null);
+    setQuestion("");
+  }
+
+  /* 回答里的链接多为知识库内部相对路径(../xx.md),站外无法打开:
+     外部 http 链接照常新开页;内部链接转成「继续追问」入口,点击即向助手提问 */
+  const mdComponents = {
+    a: (props: unknown) => {
+      const { href, children } = props as { href?: string; children?: React.ReactNode };
+      if (href && /^https?:\/\//.test(href)) {
+        return (
+          <a href={href} target="_blank" rel="noopener noreferrer">
+            {children}
+          </a>
+        );
+      }
+      const topic = (Array.isArray(children) ? children.join("") : String(children ?? "")).trim();
+      return (
+        <button
+          type="button"
+          title={`向助手追问「${topic}」`}
+          onClick={() => topic && handleAsk(`请根据本站文档，详细介绍「${topic}」。`)}
+          className="cursor-pointer border-none bg-transparent p-0 underline decoration-dashed underline-offset-2"
+          style={{ color: "var(--accent)", font: "inherit" }}
+        >
+          {children}
+        </button>
+      );
+    },
+  };
+
+  const lastIsUser = messages[messages.length - 1]?.role === "user";
 
   return (
     <>
@@ -221,28 +323,39 @@ export default function Assistant() {
               </span>
               <div className="leading-tight">
                 <div className="text-sm font-semibold">文档智能助手</div>
-                <div className="text-[11px] text-white/70">基于本地文档检索生成</div>
+                <div className="text-[11px] text-white/70">基于本地文档检索 · 支持多轮追问</div>
               </div>
             </div>
-            <button
-              onClick={() => setOpen(false)}
-              aria-label="关闭"
-              className="rounded-md p-1 text-white/80 transition-colors hover:bg-white/15 hover:text-white"
-            >
-              <IconClose />
-            </button>
+            <div className="flex items-center gap-1.5">
+              {messages.length > 0 && (
+                <button
+                  onClick={newConversation}
+                  disabled={loading}
+                  className="rounded-md border border-white/25 px-2 py-1 text-[11px] text-white/85 transition-colors hover:bg-white/15 hover:text-white disabled:opacity-40"
+                >
+                  新对话
+                </button>
+              )}
+              <button
+                onClick={() => setOpen(false)}
+                aria-label="关闭"
+                className="rounded-md p-1 text-white/80 transition-colors hover:bg-white/15 hover:text-white"
+              >
+                <IconClose />
+              </button>
+            </div>
           </header>
 
-          {/* 内容区（可滚动） */}
-          <div className="thin-scroll flex-1 overflow-y-auto px-4 py-4" style={{ background: "var(--surface-muted)" }}>
+          {/* 对话线程（可滚动） */}
+          <div ref={scrollRef} className="thin-scroll flex-1 overflow-y-auto px-4 py-4" style={{ background: "var(--surface-muted)" }}>
             {/* 空状态 */}
-            {!answer && !error && !loading && !failed && (
+            {messages.length === 0 && !error && !loading && !failed && (
               <div className="mt-6 text-center text-sm" style={{ color: "var(--muted)" }}>
                 <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl" style={{ background: "var(--accent-soft)", color: "var(--accent)" }}>
                   <IconChat />
                 </div>
                 <p className="font-medium" style={{ color: "var(--foreground)" }}>有什么可以帮你？</p>
-                <p className="mt-1">问我关于文档内容的任何问题</p>
+                <p className="mt-1">支持多轮追问，比如问完部署方式再问「第二种的前置要求」</p>
                 <div className="mt-4 flex flex-col gap-2">
                   {["这个产品是什么？", "支持哪些数据类型？", "如何快速开始？"].map((s) => (
                     <button
@@ -258,106 +371,89 @@ export default function Assistant() {
               </div>
             )}
 
-            {loading && !answer && (
-              <div className="flex items-center gap-2 text-sm" style={{ color: "var(--muted)" }}>
-                <span className="h-2 w-2 animate-pulse rounded-full" style={{ background: "var(--accent)" }} />
-                {waking ? "连接有点慢，正在自动重试…" : "正在检索文档并生成回答…"}
-              </div>
-            )}
-
-            {error && (
-              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                ⚠️ {error}
-              </div>
-            )}
-
-            {/* 网络/唤醒重试仍失败:体面兜底,给一键重试,不裸奔 network error */}
-            {failed && !loading && (
-              <div className="rounded-xl border bg-white px-4 py-4 text-sm" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
-                <p className="font-medium" style={{ color: "var(--foreground)" }}>服务有点忙，暂时没连上 😴</p>
-                <p className="mt-1 leading-relaxed">
-                  可能是网络瞬时波动，稍等片刻再点重试通常就好了。
-                </p>
-                <button
-                  onClick={() => handleAsk(lastAskedRef.current)}
-                  className="mt-3 rounded-lg px-3.5 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-[var(--accent-hover)]"
-                  style={{ background: "var(--accent)" }}
-                >
-                  重新试试 →
-                </button>
-              </div>
-            )}
-
-            {answer && (
-              <div className="rounded-xl border bg-white p-4" style={{ borderColor: "var(--border)" }}>
-                <div className="prose prose-sm max-w-none
-                                prose-headings:text-[var(--foreground)] prose-p:text-[var(--foreground)]
-                                prose-li:text-[var(--foreground)] prose-strong:text-[var(--foreground)]
-                                prose-a:text-[var(--accent)]
-                                prose-code:rounded prose-code:bg-[var(--accent-soft)] prose-code:px-1 prose-code:py-0.5 prose-code:text-[var(--accent)] prose-code:before:content-none prose-code:after:content-none
-                                prose-pre:bg-[#013128] prose-pre:text-[#d9efe6] prose-pre:text-[12px]">
-                  {/* 回答里的链接多为知识库内部相对路径(../xx.md),站外无法打开:
-                      外部 http 链接照常新开页;内部链接转成「继续追问」入口,点击即向助手提问 */}
-                  <ReactMarkdown
-                    components={{
-                      a: (props) => {
-                        const { href, children } = props as { href?: string; children?: React.ReactNode };
-                        if (href && /^https?:\/\//.test(href)) {
-                          return (
-                            <a href={href} target="_blank" rel="noopener noreferrer">
-                              {children}
-                            </a>
-                          );
-                        }
-                        const topic = (Array.isArray(children) ? children.join("") : String(children ?? "")).trim();
-                        return (
-                          <button
-                            type="button"
-                            title={`向助手追问「${topic}」`}
-                            onClick={() => topic && handleAsk(`请根据本站文档，详细介绍「${topic}」。`)}
-                            className="cursor-pointer border-none bg-transparent p-0 font-inherit underline decoration-dashed underline-offset-2"
-                            style={{ color: "var(--accent)", font: "inherit" }}
-                          >
-                            {children}
-                          </button>
-                        );
-                      },
-                    }}
-                  >
-                    {answer}
-                  </ReactMarkdown>
-                </div>
-              </div>
-            )}
-
-            {sources.length > 0 && (
-              <div className="mt-3 flex flex-col gap-1.5">
-                <div className="px-0.5 text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>
-                  参考来源
-                </div>
-                {sources.map((s, i) => (
-                  <div key={i} className="overflow-hidden rounded-lg border bg-white" style={{ borderColor: "var(--border)" }}>
-                    <button
-                      onClick={() => setOpenIdx(openIdx === i ? null : i)}
-                      className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-[var(--surface-muted)]"
+            <div className="flex flex-col gap-3">
+              {messages.map((m, mi) =>
+                m.role === "user" ? (
+                  <div key={mi} className="flex justify-end">
+                    <div
+                      className="max-w-[85%] whitespace-pre-wrap rounded-xl rounded-br-sm px-3.5 py-2 text-[13.5px] leading-relaxed text-white"
+                      style={{ background: "var(--accent)" }}
                     >
-                      <span className="min-w-0 flex-1 truncate font-mono text-[11px]" style={{ color: "var(--foreground)" }}>
-                        {s.filePath}
-                      </span>
-                      <span className="shrink-0 font-mono text-[10px]" style={{ color: "var(--muted)" }}>
-                        {s.score.toFixed(2)} {openIdx === i ? "▲" : "▼"}
-                      </span>
-                    </button>
-                    {openIdx === i && (
-                      <div className="thin-scroll max-h-48 overflow-auto whitespace-pre-wrap border-t px-3 py-2 text-[12px] leading-relaxed" style={{ borderColor: "var(--border)", color: "var(--muted)", background: "var(--surface-muted)" }}>
-                        <div className="mb-1 font-medium" style={{ color: "var(--foreground)" }}>{s.heading}</div>
-                        {s.content}
+                      {m.content}
+                    </div>
+                  </div>
+                ) : (
+                  <div key={mi}>
+                    <div className="rounded-xl rounded-bl-sm border bg-white p-4" style={{ borderColor: "var(--border)" }}>
+                      <div className={PROSE_CLS}>
+                        <ReactMarkdown components={mdComponents}>{m.content}</ReactMarkdown>
+                      </div>
+                    </div>
+                    {(m.sources?.length ?? 0) > 0 && (
+                      <div className="mt-2 flex flex-col gap-1.5">
+                        <div className="px-0.5 text-[11px] font-semibold uppercase tracking-wide" style={{ color: "var(--muted)" }}>
+                          参考来源
+                        </div>
+                        {m.sources!.map((s, si) => {
+                          const key = `${mi}-${si}`;
+                          return (
+                            <div key={key} className="overflow-hidden rounded-lg border bg-white" style={{ borderColor: "var(--border)" }}>
+                              <button
+                                onClick={() => setOpenSrc(openSrc === key ? null : key)}
+                                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left transition-colors hover:bg-[var(--surface-muted)]"
+                              >
+                                <span className="min-w-0 flex-1 truncate font-mono text-[11px]" style={{ color: "var(--foreground)" }}>
+                                  {s.filePath}
+                                </span>
+                                <span className="shrink-0 font-mono text-[10px]" style={{ color: "var(--muted)" }}>
+                                  {s.score.toFixed(2)} {openSrc === key ? "▲" : "▼"}
+                                </span>
+                              </button>
+                              {openSrc === key && (
+                                <div className="thin-scroll max-h-48 overflow-auto whitespace-pre-wrap border-t px-3 py-2 text-[12px] leading-relaxed" style={{ borderColor: "var(--border)", color: "var(--muted)", background: "var(--surface-muted)" }}>
+                                  <div className="mb-1 font-medium" style={{ color: "var(--foreground)" }}>{s.heading}</div>
+                                  {s.content}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
                   </div>
-                ))}
-              </div>
-            )}
+                )
+              )}
+
+              {loading && lastIsUser && (
+                <div className="flex items-center gap-2 text-sm" style={{ color: "var(--muted)" }}>
+                  <span className="h-2 w-2 animate-pulse rounded-full" style={{ background: "var(--accent)" }} />
+                  {waking ? "连接有点慢，正在自动重试…" : "正在检索文档并生成回答…"}
+                </div>
+              )}
+
+              {error && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  ⚠️ {error}
+                </div>
+              )}
+
+              {/* 网络/超时重试仍失败:体面兜底,给一键重试,不裸奔 network error */}
+              {failed && !loading && (
+                <div className="rounded-xl border bg-white px-4 py-4 text-sm" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
+                  <p className="font-medium" style={{ color: "var(--foreground)" }}>服务有点忙，暂时没连上 😴</p>
+                  <p className="mt-1 leading-relaxed">
+                    可能是网络瞬时波动，稍等片刻再点重试通常就好了。
+                  </p>
+                  <button
+                    onClick={() => handleAsk(lastAskedRef.current, true)}
+                    className="mt-3 rounded-lg px-3.5 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-[var(--accent-hover)]"
+                    style={{ background: "var(--accent)" }}
+                  >
+                    重新试试 →
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* 输入区 */}
@@ -373,7 +469,7 @@ export default function Assistant() {
                     handleAsk();
                   }
                 }}
-                placeholder="输入你的问题…"
+                placeholder={messages.length ? "继续追问…" : "输入你的问题…"}
                 className="thin-scroll max-h-28 flex-1 resize-none rounded-lg border px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--accent)]"
                 style={{ borderColor: "var(--border)", color: "var(--foreground)" }}
               />
