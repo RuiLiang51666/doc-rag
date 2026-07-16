@@ -13,12 +13,14 @@ const nextConfig = {
         "./data/embeddings.json",
         "./node_modules/@huggingface/transformers/node_modules/sharp/**",
         "./node_modules/@huggingface/transformers/node_modules/@img/**",
+        "./node_modules/@img/**",
       ],
       "/api/search": [
         "./models/**/*",
         "./data/embeddings.json",
         "./node_modules/@huggingface/transformers/node_modules/sharp/**",
         "./node_modules/@huggingface/transformers/node_modules/@img/**",
+        "./node_modules/@img/**",
       ],
     },
     // 只保留 linux/x64 的 ONNX 运行时二进制(Vercel 目标平台),其余平台约 52MB 不进函数包。
