@@ -55,9 +55,9 @@ export default function Assistant() {
     return () => { clearTimeout(t1); clearTimeout(t2); };
   }, []);
 
-  // 免费实例冷启动最长约 50s,单次给到 75s 容忍唤醒;超时/断连/网关错误自动重试
+  // Vercel serverless 冷启动为秒级(模型加载 3-5s),30s 已含充分余量;超时/断连/网关错误自动重试
   const MAX_ATTEMPTS = 3; // 1 正常 + 2 重试
-  const ATTEMPT_TIMEOUT = 75_000;
+  const ATTEMPT_TIMEOUT = 30_000;
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   /**
@@ -261,7 +261,7 @@ export default function Assistant() {
             {loading && !answer && (
               <div className="flex items-center gap-2 text-sm" style={{ color: "var(--muted)" }}>
                 <span className="h-2 w-2 animate-pulse rounded-full" style={{ background: "var(--accent)" }} />
-                {waking ? "服务正在唤醒，请稍候…（首次访问约需 1 分钟）" : "正在检索文档并生成回答…"}
+                {waking ? "连接有点慢，正在自动重试…" : "正在检索文档并生成回答…"}
               </div>
             )}
 
@@ -276,7 +276,7 @@ export default function Assistant() {
               <div className="rounded-xl border bg-white px-4 py-4 text-sm" style={{ borderColor: "var(--border)", color: "var(--muted)" }}>
                 <p className="font-medium" style={{ color: "var(--foreground)" }}>服务有点忙，暂时没连上 😴</p>
                 <p className="mt-1 leading-relaxed">
-                  演示服务部署在免费实例上，空闲后会休眠。可能正在唤醒，稍等片刻再点重试通常就好了。
+                  可能是网络瞬时波动，稍等片刻再点重试通常就好了。
                 </p>
                 <button
                   onClick={() => handleAsk(lastAskedRef.current)}

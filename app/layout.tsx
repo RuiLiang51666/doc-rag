@@ -7,7 +7,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "智能问答 · 梁瑞",
     description: "基于本地知识库的 RAG 智能问答 demo：流式响应、查询改写、来源标注。",
-    url: "https://doc-rag-6lm6.onrender.com",
+    url: "https://liangrui-qa.vercel.app",
     type: "website",
   },
 };
